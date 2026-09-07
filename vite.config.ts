@@ -8,13 +8,13 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon-192.png', 'icon-512.png'],
+      includeAssets: ['icon-180.png', 'icon-192.png', 'icon-512.png'],
       manifest: {
         name: 'Lift — Local Strength Log',
         short_name: 'Lift',
         description: 'A private, offline-first powerlifting tracker.',
-        theme_color: '#0b0d0c',
-        background_color: '#0b0d0c',
+        theme_color: '#090c0a',
+        background_color: '#090c0a',
         display: 'standalone',
         start_url: './',
         scope: './',

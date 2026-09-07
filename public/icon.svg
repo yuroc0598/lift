@@ -1,8 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#0b0d0c"/>
-  <rect x="76" y="232" width="360" height="48" rx="24" fill="#c8ff3d"/>
-  <rect x="106" y="168" width="40" height="176" rx="16" fill="#f5f6ef"/>
-  <rect x="366" y="168" width="40" height="176" rx="16" fill="#f5f6ef"/>
-  <rect x="52" y="196" width="36" height="120" rx="14" fill="#c8ff3d"/>
-  <rect x="424" y="196" width="36" height="120" rx="14" fill="#c8ff3d"/>
+  <defs>
+    <radialGradient id="glow" cx="78%" cy="10%" r="92%">
+      <stop offset="0" stop-color="#243019"/>
+      <stop offset="0.58" stop-color="#0d120f"/>
+      <stop offset="1" stop-color="#080a09"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#glow)"/>
+  <path d="M146 104v254h204" fill="none" stroke="#ceff45" stroke-width="72" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="334" y="294" width="56" height="128" rx="28" fill="#f4f6ee"/>
+  <rect x="402" y="316" width="34" height="84" rx="17" fill="#ceff45"/>
 </svg>

@@ -28,11 +28,11 @@ export default function WorkoutView({ session, settings, restTimerEnd, onUpdate,
   const cancel = () => { if (window.confirm('Discard this active workout? Your completed history will not be affected.')) onCancel() }
 
   return <div className="workout-shell">
-    <header className="workout-header"><button className="text-button danger-text" onClick={cancel}>Cancel</button><div><strong>{session.name}</strong><span><ElapsedTimer startedAt={session.startedAt} /> · {workingCompleted}/{workingTotal} work · {warmupCompleted}/{warmupTotal} warm-up</span></div><button className="text-button accent-text" onClick={finish}>Finish</button></header>
+    <header className="workout-header"><button className="text-button danger-text" onClick={cancel}>Cancel</button><div><strong>{session.name}</strong><span><ElapsedTimer startedAt={session.startedAt} /> · {completionPercent}% complete</span></div><button className="text-button accent-text" onClick={finish}>Finish</button></header>
     <div className="session-progress" role="progressbar" aria-label="Workout completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={completionPercent}><span style={{ width: `${completionPercent}%` }} /></div>
     <main className="workout-content">
-      <div className="workout-title"><div className="eyebrow">{session.programName} · {session.day}</div><h1>{session.variation ?? session.name}</h1></div>
-      {session.exercises.map((exercise, exerciseIndex) => <ExerciseCard key={exercise.logId} exercise={exercise} unit={settings.unit} barWeight={settings.barWeightLb} plates={settings.platesLb} onUpdate={(updater) => updateExercise(exerciseIndex, updater)} onSetCompleted={(seconds) => { if (settings.autoStartRest) onStartRest(seconds) }} />)}
+      <div className="workout-title"><div className="eyebrow">{session.programName} · {session.day}</div><h1>{session.variation ?? session.name}</h1><div className="workout-metrics"><span><b>{workingCompleted}/{workingTotal} work</b> sets</span><span><b>{warmupCompleted}/{warmupTotal} warm-up</b> sets</span></div></div>
+      {session.exercises.map((exercise, exerciseIndex) => <ExerciseCard key={exercise.logId} index={exerciseIndex + 1} exercise={exercise} unit={settings.unit} barWeight={settings.barWeightLb} plates={settings.platesLb} onUpdate={(updater) => updateExercise(exerciseIndex, updater)} onSetCompleted={(seconds) => { if (settings.autoStartRest) onStartRest(seconds) }} />)}
       <label className="notes-field"><span>Workout notes</span><textarea value={session.notes} placeholder="How did the session feel?" onChange={(event) => onUpdate((current) => ({ ...current, notes: event.target.value }))} /></label>
       <button className="primary-button finish-button" onClick={finish}><CircleCheck /> Finish workout</button>
     </main>
@@ -49,7 +49,8 @@ function ElapsedTimer({ startedAt }: { startedAt: string }) {
   return <>{formatDuration(elapsed)}</>
 }
 
-function ExerciseCard({ exercise, unit, barWeight, plates, onUpdate, onSetCompleted }: {
+function ExerciseCard({ index, exercise, unit, barWeight, plates, onUpdate, onSetCompleted }: {
+  index: number
   exercise: ExerciseLog
   unit: 'lb' | 'kg'
   barWeight: number
@@ -92,7 +93,7 @@ function ExerciseCard({ exercise, unit, barWeight, plates, onUpdate, onSetComple
   return (
     <article className={exercise.skipped ? 'exercise-card skipped' : 'exercise-card'}>
       <div className="exercise-heading">
-        <div><span className={`category-dot ${definition?.category ?? 'pull'}`} /><h2>{exercise.name}</h2><p>{exerciseScheme(exercise)} · target RPE {exercise.targetRpe}</p></div>
+        <div><span className={`category-dot ${definition?.category ?? 'pull'}`} /><span className="exercise-order">{String(index).padStart(2, '0')}</span><h2>{exercise.name}</h2><p>{exerciseScheme(exercise)} · target RPE {exercise.targetRpe}</p></div>
         <button className="skip-button" onClick={() => onUpdate((current) => ({ ...current, skipped: !current.skipped }))}>{exercise.skipped ? 'Undo' : exercise.optional ? 'Skip optional' : 'Skip'}</button>
       </div>
       {!exercise.skipped && <>
