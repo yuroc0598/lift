@@ -23,6 +23,25 @@ describe('app workflow', () => {
     expect(screen.getByText(/1\/22 work/)).toBeInTheDocument()
   })
 
+  it('auto-collapses a completed exercise and lets the user expand it again', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Competition' })
+    await user.click(screen.getByRole('button', { name: /start workout/i }))
+
+    for (let set = 1; set <= 5; set += 1) {
+      await user.click(screen.getByRole('button', { name: `Complete Back Squat set ${set}` }))
+    }
+
+    const expand = await screen.findByRole('button', { name: 'Expand Back Squat' })
+    expect(screen.queryByLabelText('Back Squat working weight')).not.toBeInTheDocument()
+    expect(screen.getByText('5/5 working sets complete')).toBeInTheDocument()
+
+    await user.click(expand)
+    expect(screen.getByLabelText('Back Squat working weight')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Collapse Back Squat' })).toHaveAttribute('aria-expanded', 'true')
+  })
+
   it('shows total lifted volume after finishing and includes completed warm-ups', async () => {
     const user = userEvent.setup()
     render(<App />)

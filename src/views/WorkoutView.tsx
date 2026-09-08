@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { CircleCheck, TimerReset } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ChevronDown, CircleCheck, TimerReset } from 'lucide-react'
 import { calculatePlates, completedSetCount, displayWeight, lbToInputWeight, MAX_SUPPORTED_WEIGHT_LB, maximumInputWeight, parseWeightInput, roundToIncrement, warmupSets as buildWarmupSets } from '../lifting'
 import { EXERCISES } from '../program'
 import type { AppState, ExerciseLog, SetLog, WorkoutSession } from '../types'
@@ -64,6 +64,18 @@ function ExerciseCard({ index, exercise, unit, barWeight, plates, onUpdate, onSe
   const topSetWeight = loadedWeights.length ? Math.max(...loadedWeights) : null
   const ramped = new Set(loadedWeights).size > 1
   const plateResult = definition?.barbell && topSetWeight != null ? calculatePlates(topSetWeight, barWeight, plates) : null
+  const workingSetsCompleted = exercise.sets.filter((set) => set.complete).length
+  const warmupSetsCompleted = exercise.warmupSets.filter((set) => set.complete).length
+  const workingSetsComplete = exercise.sets.length > 0 && workingSetsCompleted === exercise.sets.length
+  const [expanded, setExpanded] = useState(() => !workingSetsComplete)
+  const wasComplete = useRef(workingSetsComplete)
+  const bodyId = `exercise-body-${exercise.logId}`
+
+  useEffect(() => {
+    if (workingSetsComplete && !wasComplete.current) setExpanded(false)
+    if (!workingSetsComplete && wasComplete.current) setExpanded(true)
+    wasComplete.current = workingSetsComplete
+  }, [workingSetsComplete])
 
   const updateSet = (setIndex: number, patch: Partial<SetLog>) => onUpdate((current) => ({
     ...current,
@@ -91,12 +103,17 @@ function ExerciseCard({ index, exercise, unit, barWeight, plates, onUpdate, onSe
   })
 
   return (
-    <article className={exercise.skipped ? 'exercise-card skipped' : 'exercise-card'}>
+    <article className={['exercise-card', exercise.skipped ? 'skipped' : '', workingSetsComplete ? 'is-complete' : '', !exercise.skipped && !expanded ? 'collapsed' : ''].filter(Boolean).join(' ')}>
       <div className="exercise-heading">
         <div><span className={`category-dot ${definition?.category ?? 'pull'}`} /><span className="exercise-order">{String(index).padStart(2, '0')}</span><h2>{exercise.name}</h2><p>{exerciseScheme(exercise)} · target RPE {exercise.targetRpe}</p></div>
-        <button className="skip-button" onClick={() => onUpdate((current) => ({ ...current, skipped: !current.skipped }))}>{exercise.skipped ? 'Undo' : exercise.optional ? 'Skip optional' : 'Skip'}</button>
+        <div className="exercise-actions">
+          {workingSetsComplete && !exercise.skipped && <span className="exercise-done"><CircleCheck />Done</span>}
+          {(!workingSetsComplete || exercise.skipped) && <button className="skip-button" onClick={() => onUpdate((current) => ({ ...current, skipped: !current.skipped }))}>{exercise.skipped ? 'Undo' : exercise.optional ? 'Skip optional' : 'Skip'}</button>}
+          {!exercise.skipped && <button className="collapse-button" aria-label={`${expanded ? 'Collapse' : 'Expand'} ${exercise.name}`} aria-expanded={expanded} aria-controls={bodyId} onClick={() => setExpanded((current) => !current)}><ChevronDown /></button>}
+        </div>
       </div>
-      {!exercise.skipped && <>
+      {!exercise.skipped && <div id={bodyId} className={expanded ? 'exercise-body' : 'exercise-body collapsed-body'}>
+        {!expanded ? <button className="exercise-summary" onClick={() => setExpanded(true)}><CircleCheck /><span><strong>{workingSetsCompleted}/{exercise.sets.length} working sets complete</strong><small>{exercise.warmupSets.length ? `${warmupSetsCompleted}/${exercise.warmupSets.length} warm-ups logged` : 'Tap to review or edit'}</small></span><b>Review</b></button> : <>
         {definition?.weightMode !== 'none' && (
           <div className="working-weight">
             <label>
@@ -129,7 +146,8 @@ function ExerciseCard({ index, exercise, unit, barWeight, plates, onUpdate, onSe
           ))}
         </div>
         <label className="exercise-notes"><span>Notes</span><input value={exercise.notes} placeholder="Optional" onChange={(event) => onUpdate((current) => ({ ...current, notes: event.target.value }))} /></label>
-      </>}
+        </>}
+      </div>}
     </article>
   )
 }
