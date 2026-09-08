@@ -309,9 +309,6 @@ h2 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
 .set-row-title small { margin-top: 3px; color: var(--muted); font-size: 9px; }
 .next-set-badge { flex: 0 0 auto; padding: 4px 6px; color: var(--accent); border-radius: 999px; background: rgba(206,255,69,.08); font-size: 8px; font-weight: 900; letter-spacing: .07em; text-transform: uppercase; }
 .warmup-row .next-set-badge { color: var(--warmup); background: rgba(241,186,97,.09); }
-.set-rpe { flex: 0 0 56px; }
-.set-rpe > span { display: block; margin-bottom: 3px; color: var(--muted); text-align: center; font-size: 8px; font-weight: 850; letter-spacing: .06em; }
-.set-rpe select { width: 56px; height: 40px; padding: 0 3px; color: var(--text); text-align: center; text-align-last: center; border: 1px solid var(--line); border-radius: 10px; background: #0e120f; font-size: 14px; }
 .set-adjusters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
 .set-adjusters.single { grid-template-columns: minmax(0, 1fr); }
 .number-stepper { min-width: 0; }

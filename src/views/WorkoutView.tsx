@@ -162,7 +162,6 @@ function ExerciseCard({ index, exercise, unit, barWeight, plates, onUpdate, onSe
               <div className="set-row-top">
                 <div className="set-row-title"><strong>Set {set.number}{set.plusSet ? '+' : ''}</strong><small>{setTargetLabel(set, timed)}</small></div>
                 {current && <span className="next-set-badge">Next</span>}
-                <label className="set-rpe"><span>RPE</span><select aria-label={`${exercise.name} set ${set.number} RPE`} value={set.rpe ?? ''} onChange={(event) => updateSet(setIndex, { rpe: finiteNumberOrNull(event.target.value) })}><option value="">—</option>{[6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10].map((rpe) => <option key={rpe} value={rpe}>{rpe}</option>)}</select></label>
                 <button className="complete-set-button" aria-label={`${set.complete ? 'Undo' : 'Complete'} ${exercise.name} set ${set.number}`} aria-pressed={set.complete} onClick={() => { updateSet(setIndex, { complete: !set.complete }); if (!set.complete) onSetCompleted(exercise.restSeconds) }}><CircleCheck /><span>{set.complete ? 'Undo' : 'Done'}</span></button>
               </div>
               <div className={definition?.weightMode === 'none' ? 'set-adjusters single' : 'set-adjusters'}>
