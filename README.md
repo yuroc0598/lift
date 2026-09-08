@@ -21,7 +21,9 @@ Plans keep separate progression weights and cycle positions. Switching plans nev
 
 ## Data
 
-Workout state and history are stored locally in IndexedDB. Settings includes CSV export and import for complete workout and set history; custom program definitions and app settings remain device-local. Removing the app or clearing Safari website data can remove IndexedDB, so save the CSV periodically to Files or iCloud Drive.
+Workout state and history are stored locally in IndexedDB. Every in-progress change is autosaved, with a synchronous local recovery draft protecting the active workout if iOS closes the app before an IndexedDB write finishes. Reopening Lift restores the session, completed sets, edited values, notes, and rest timer at the next incomplete set.
+
+Settings includes CSV export and import for complete workout and set history; custom program definitions and app settings remain device-local. Removing the app or clearing Safari website data can remove both local stores, so save the CSV periodically to Files or iCloud Drive.
 
 Barbell workouts include editable, checkable warm-up sets. Completed warm-ups are saved in history and CSV exports and are included in the post-workout total-volume summary. For pull-ups, dips, knee raises, and other bodyweight movements, volume includes bodyweight plus any added load.
 

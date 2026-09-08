@@ -5,6 +5,7 @@ import type { AppState, ExerciseLog, ProgramDefinition, ProgramRuntime, SetLog, 
 const DB_NAME = 'lift-local'
 const STORE_NAME = 'app-state'
 const STATE_KEY = 'primary'
+const ACTIVE_DRAFT_KEY = 'lift-active-session-draft'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -58,6 +59,42 @@ function openDatabase(): Promise<IDBDatabase> {
   })
 }
 
+export function persistActiveDraft(state: Pick<AppState, 'activeSession' | 'restTimerEnd'>): void {
+  try {
+    if (!state.activeSession) {
+      localStorage.removeItem(ACTIVE_DRAFT_KEY)
+      return
+    }
+    localStorage.setItem(ACTIVE_DRAFT_KEY, JSON.stringify({
+      version: 1,
+      savedAt: new Date().toISOString(),
+      activeSession: state.activeSession,
+      restTimerEnd: state.restTimerEnd,
+    }))
+  } catch {
+    // IndexedDB remains the canonical store when synchronous recovery storage is unavailable.
+  }
+}
+
+function restoreActiveDraft(state: AppState): AppState {
+  try {
+    const text = localStorage.getItem(ACTIVE_DRAFT_KEY)
+    if (!text) return state
+    const draft: unknown = JSON.parse(text)
+    if (!isRecord(draft) || draft.version !== 1 || !isRecord(draft.activeSession)) throw new Error('Invalid active workout draft')
+    const activeSession = migrateSession(draft.activeSession, true, state.settings.barWeightLb)
+    if (state.history.some((session) => session.id === activeSession.id)) {
+      localStorage.removeItem(ACTIVE_DRAFT_KEY)
+      return state
+    }
+    const restTimerEnd = typeof draft.restTimerEnd === 'string' && Number.isFinite(Date.parse(draft.restTimerEnd)) ? draft.restTimerEnd : null
+    return { ...state, activeSession, restTimerEnd }
+  } catch {
+    localStorage.removeItem(ACTIVE_DRAFT_KEY)
+    return state
+  }
+}
+
 export async function loadState(): Promise<AppState> {
   const db = await openDatabase()
   const stored = await new Promise<Record<string, unknown> | undefined>((resolve, reject) => {
@@ -67,7 +104,7 @@ export async function loadState(): Promise<AppState> {
   })
   db.close()
   const initial = createInitialState()
-  if (!stored) return initial
+  if (!stored) return restoreActiveDraft(initial)
   if (stored.schemaVersion === 2) {
     const current = stored as unknown as AppState
     const customPrograms = Array.isArray(current.customPrograms) ? current.customPrograms.filter(isValidCustomProgram) : []
@@ -91,10 +128,10 @@ export async function loadState(): Promise<AppState> {
     const history = Array.isArray(current.history) ? current.history.filter((session) => session && typeof session === 'object').map((session) => migrateSession(session as unknown as Record<string, unknown>)) : []
     const activeSession = current.activeSession && typeof current.activeSession === 'object' ? migrateSession(current.activeSession as unknown as Record<string, unknown>, true, settings.barWeightLb) : null
     const restTimerEnd = typeof current.restTimerEnd === 'string' && Number.isFinite(Date.parse(current.restTimerEnd)) ? current.restTimerEnd : null
-    return { ...initial, activeProgramId, programStates, customPrograms, history, activeSession, restTimerEnd, settings }
+    return restoreActiveDraft({ ...initial, activeProgramId, programStates, customPrograms, history, activeSession, restTimerEnd, settings })
   }
-  if (stored.schemaVersion === 1) return migrateVersionOne(stored, initial)
-  return initial
+  if (stored.schemaVersion === 1) return restoreActiveDraft(migrateVersionOne(stored, initial))
+  return restoreActiveDraft(initial)
 }
 
 function migrateVersionOne(stored: Record<string, unknown>, initial: AppState): AppState {
@@ -205,6 +242,7 @@ export async function saveState(state: AppState): Promise<void> {
 }
 
 export async function clearStoredState(): Promise<void> {
+  try { localStorage.removeItem(ACTIVE_DRAFT_KEY) } catch { /* Ignore unavailable synchronous storage. */ }
   const db = await openDatabase()
   await new Promise<void>((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, 'readwrite')

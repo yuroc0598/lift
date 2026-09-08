@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, CircleCheck, TimerReset } from 'lucide-react'
+import { ChevronDown, CircleCheck, RotateCcw, TimerReset } from 'lucide-react'
 import { calculatePlates, completedSetCount, displayWeight, lbToInputWeight, MAX_SUPPORTED_WEIGHT_LB, maximumInputWeight, parseWeightInput, roundToIncrement, warmupSets as buildWarmupSets } from '../lifting'
 import { EXERCISES } from '../program'
 import type { AppState, ExerciseLog, SetLog, WorkoutSession } from '../types'
 import { exerciseScheme, formatDuration } from '../ui'
 
-export default function WorkoutView({ session, settings, restTimerEnd, onUpdate, onStartRest, onDismissRest, onFinish, onCancel }: {
+export default function WorkoutView({ session, settings, restTimerEnd, saveStatus, resumed, onUpdate, onStartRest, onDismissRest, onFinish, onCancel }: {
   session: WorkoutSession
   settings: AppState['settings']
   restTimerEnd: string | null
+  saveStatus: 'saving' | 'saved' | 'error'
+  resumed: boolean
   onUpdate: (updater: (session: WorkoutSession) => WorkoutSession) => void
   onStartRest: (seconds: number) => void
   onDismissRest: () => void
@@ -23,16 +25,19 @@ export default function WorkoutView({ session, settings, restTimerEnd, onUpdate,
   const warmupTotal = activeExercises.reduce((sum, exercise) => sum + exercise.warmupSets.length, 0)
   const total = workingTotal + warmupTotal
   const completionPercent = total ? Math.round(completed / total * 100) : 100
+  const nextExerciseIndex = session.exercises.findIndex((exercise) => !exercise.skipped && exercise.sets.some((set) => !set.complete))
+  const nextExercise = nextExerciseIndex >= 0 ? session.exercises[nextExerciseIndex] : null
+  const nextSet = nextExercise?.sets.find((set) => !set.complete) ?? null
   const updateExercise = (exerciseIndex: number, updater: (exercise: ExerciseLog) => ExerciseLog) => onUpdate((current) => ({ ...current, exercises: current.exercises.map((exercise, index) => index === exerciseIndex ? updater(exercise) : exercise) }))
   const finish = () => { if (completed === total || window.confirm(`Finish with ${total - completed} incomplete sets?`)) onFinish() }
   const cancel = () => { if (window.confirm('Discard this active workout? Your completed history will not be affected.')) onCancel() }
 
   return <div className="workout-shell">
-    <header className="workout-header"><button className="text-button danger-text" onClick={cancel}>Cancel</button><div><strong>{session.name}</strong><span><ElapsedTimer startedAt={session.startedAt} /> · {completionPercent}% complete</span></div><button className="text-button accent-text" onClick={finish}>Finish</button></header>
+    <header className="workout-header"><button className="text-button danger-text" onClick={cancel}>Cancel</button><div><strong>{session.name}</strong><span><ElapsedTimer startedAt={session.startedAt} /> · {completionPercent}% · <i className={`save-state ${saveStatus}`} aria-live="polite">{saveStatus === 'saving' ? 'Saving…' : saveStatus === 'error' ? 'Not saved' : 'Saved'}</i></span></div><button className="text-button accent-text" onClick={finish}>Finish</button></header>
     <div className="session-progress" role="progressbar" aria-label="Workout completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={completionPercent}><span style={{ width: `${completionPercent}%` }} /></div>
     <main className="workout-content">
-      <div className="workout-title"><div className="eyebrow">{session.programName} · {session.day}</div><h1>{session.variation ?? session.name}</h1><div className="workout-metrics"><span><b>{workingCompleted}/{workingTotal} work</b> sets</span><span><b>{warmupCompleted}/{warmupTotal} warm-up</b> sets</span></div></div>
-      {session.exercises.map((exercise, exerciseIndex) => <ExerciseCard key={exercise.logId} index={exerciseIndex + 1} exercise={exercise} unit={settings.unit} barWeight={settings.barWeightLb} plates={settings.platesLb} onUpdate={(updater) => updateExercise(exerciseIndex, updater)} onSetCompleted={(seconds) => { if (settings.autoStartRest) onStartRest(seconds) }} />)}
+      <div className="workout-title"><div className="eyebrow">{session.programName} · {session.day}</div><h1>{session.variation ?? session.name}</h1><div className="workout-metrics"><span><b>{workingCompleted}/{workingTotal} work</b> sets</span><span><b>{warmupCompleted}/{warmupTotal} warm-up</b> sets</span></div>{resumed && (nextExercise ? <button className="resume-session" onClick={() => document.getElementById(`exercise-${nextExercise.logId}`)?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })}><RotateCcw /><span><strong>Workout restored</strong><small>Continue {nextExercise.name} · set {nextSet?.number}</small></span><ChevronDown /></button> : <div className="resume-session complete"><CircleCheck /><span><strong>Workout restored</strong><small>All working sets are done—finish when ready.</small></span></div>)}</div>
+      {session.exercises.map((exercise, exerciseIndex) => <ExerciseCard key={exercise.logId} index={exerciseIndex + 1} isNext={exerciseIndex === nextExerciseIndex} exercise={exercise} unit={settings.unit} barWeight={settings.barWeightLb} plates={settings.platesLb} onUpdate={(updater) => updateExercise(exerciseIndex, updater)} onSetCompleted={(seconds) => { if (settings.autoStartRest) onStartRest(seconds) }} />)}
       <label className="notes-field"><span>Workout notes</span><textarea value={session.notes} placeholder="How did the session feel?" onChange={(event) => onUpdate((current) => ({ ...current, notes: event.target.value }))} /></label>
       <button className="primary-button finish-button" onClick={finish}><CircleCheck /> Finish workout</button>
     </main>
@@ -49,8 +54,9 @@ function ElapsedTimer({ startedAt }: { startedAt: string }) {
   return <>{formatDuration(elapsed)}</>
 }
 
-function ExerciseCard({ index, exercise, unit, barWeight, plates, onUpdate, onSetCompleted }: {
+function ExerciseCard({ index, isNext, exercise, unit, barWeight, plates, onUpdate, onSetCompleted }: {
   index: number
+  isNext: boolean
   exercise: ExerciseLog
   unit: 'lb' | 'kg'
   barWeight: number
@@ -114,7 +120,7 @@ function ExerciseCard({ index, exercise, unit, barWeight, plates, onUpdate, onSe
   })
 
   return (
-    <article className={['exercise-card', exercise.skipped ? 'skipped' : '', workingSetsComplete ? 'is-complete' : '', !exercise.skipped && !expanded ? 'collapsed' : ''].filter(Boolean).join(' ')}>
+    <article id={`exercise-${exercise.logId}`} className={['exercise-card', exercise.skipped ? 'skipped' : '', workingSetsComplete ? 'is-complete' : '', !exercise.skipped && !expanded ? 'collapsed' : ''].filter(Boolean).join(' ')}>
       <div className="exercise-heading">
         <div><span className={`category-dot ${definition?.category ?? 'pull'}`} /><span className="exercise-order">{String(index).padStart(2, '0')}</span><h2>{exercise.name}</h2><p>{exerciseScheme(exercise)} · target RPE {exercise.targetRpe}</p></div>
         <div className="exercise-actions">
@@ -145,7 +151,7 @@ function ExerciseCard({ index, exercise, unit, barWeight, plates, onUpdate, onSe
         {exercise.warmupSets.length > 0 && <section className={warmupsExpanded ? 'warmup-block' : 'warmup-block collapsed'} aria-label={`${exercise.name} warm-up sets`}>
           <button type="button" className="warmup-toggle" aria-label={`${warmupsExpanded ? 'Collapse' : 'Expand'} ${exercise.name} warm-ups`} aria-expanded={warmupsExpanded} aria-controls={warmupId} onClick={() => setWarmupsExpanded((current) => !current)}><span><strong>Warm-up</strong><small>{exercise.warmupSets.length} preparation sets</small></span><b>{warmupSetsCompleted}/{exercise.warmupSets.length}</b><ChevronDown /></button>
           {warmupsExpanded && <div className="warmup-list" id={warmupId}>{exercise.warmupSets.map((set, setIndex) => {
-            const current = setIndex === nextWarmupIndex
+            const current = isNext && setIndex === nextWarmupIndex
             const weightInput = lbToInputWeight(set.weightLb, unit)
             return <div className={['warmup-row', set.complete ? 'complete' : '', current ? 'current' : ''].filter(Boolean).join(' ')} key={set.number} aria-current={current ? 'step' : undefined}>
               <div className="set-row-top"><div className="set-row-title"><strong>Warm-up {set.number}</strong><small>{displayWeight(set.weightLb, unit)} × {set.reps}</small></div>{current && <span className="next-set-badge">Next</span>}<button className="warmup-complete" aria-label={`${set.complete ? 'Undo' : 'Complete'} ${exercise.name} warm-up ${set.number}`} aria-pressed={set.complete} onClick={() => { updateWarmupSet(setIndex, { complete: !set.complete }); if (!set.complete) onSetCompleted(Math.min(90, exercise.restSeconds)) }}><CircleCheck /><span>{set.complete ? 'Undo' : 'Done'}</span></button></div>
@@ -165,7 +171,7 @@ function ExerciseCard({ index, exercise, unit, barWeight, plates, onUpdate, onSe
             const valueStep = timed ? 5 : 1
             const valueLabel = timed ? 'Seconds' : 'Reps'
             const inputLabel = `${exercise.name} set ${set.number} ${timed ? 'seconds' : 'reps'}`
-            const current = (!warmupsExpanded || nextWarmupIndex < 0) && setIndex === nextWorkingIndex
+            const current = isNext && (!warmupsExpanded || nextWarmupIndex < 0) && setIndex === nextWorkingIndex
             const weightInput = lbToInputWeight(set.weightLb, unit)
             return <div className={['set-row', set.complete ? 'complete' : '', current ? 'current' : ''].filter(Boolean).join(' ')} key={set.number} aria-current={current ? 'step' : undefined}>
               <div className="set-row-top">

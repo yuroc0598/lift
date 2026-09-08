@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { clearStoredState } from './db'
+import { clearStoredState, loadState } from './db'
 import { createInitialState, createWorkout } from './program'
 import App, { completeActiveWorkout } from './App'
 
@@ -21,6 +21,21 @@ describe('app workflow', () => {
     await user.click(screen.getByRole('button', { name: 'Complete Back Squat set 1' }))
     expect(screen.getByText('RESTING')).toBeInTheDocument()
     expect(screen.getByText(/1\/22 work/)).toBeInTheDocument()
+  })
+
+  it('restores an unfinished workout at the next incomplete set', async () => {
+    const user = userEvent.setup()
+    const firstRender = render(<App />)
+    await screen.findByRole('heading', { name: 'Competition' })
+    await user.click(screen.getByRole('button', { name: /start workout/i }))
+    await user.click(screen.getByRole('button', { name: 'Complete Back Squat set 1' }))
+    await waitFor(async () => expect((await loadState()).activeSession?.exercises[0].sets[0].complete).toBe(true))
+    firstRender.unmount()
+
+    render(<App />)
+    expect(await screen.findByText('Workout restored')).toBeInTheDocument()
+    expect(screen.getByText(/Continue Back Squat · set 2/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Undo Back Squat set 1' })).toBeInTheDocument()
   })
 
   it('auto-collapses a completed exercise and lets the user expand it again', async () => {

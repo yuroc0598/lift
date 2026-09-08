@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { clearStoredState, loadState, saveState } from './db'
+import { clearStoredState, loadState, persistActiveDraft, saveState } from './db'
 import { createInitialState, createWorkout } from './program'
 
 describe('IndexedDB storage', () => {
@@ -17,10 +17,28 @@ describe('IndexedDB storage', () => {
     const state = createInitialState()
     state.programStates['personal-powerlifting'].nextWorkoutIndex = 2
     state.settings.bodyweightLb = 151.5
+    state.activeSession = createWorkout(state, new Date('2026-09-07T16:00:00.000Z'))
+    state.activeSession.exercises[0].sets[0].complete = true
+    state.restTimerEnd = '2026-09-07T16:03:00.000Z'
     await saveState(state)
     const restored = await loadState()
     expect(restored.programStates['personal-powerlifting'].nextWorkoutIndex).toBe(2)
     expect(restored.settings.bodyweightLb).toBe(151.5)
+    expect(restored.activeSession?.exercises[0].sets[0].complete).toBe(true)
+    expect(restored.restTimerEnd).toBe('2026-09-07T16:03:00.000Z')
+  })
+
+  it('recovers the latest in-progress draft if IndexedDB did not finish writing', async () => {
+    await saveState(createInitialState())
+    const draft = createInitialState()
+    draft.activeSession = createWorkout(draft, new Date('2026-09-07T16:00:00.000Z'))
+    draft.activeSession.exercises[0].sets[0].reps = 4
+    draft.activeSession.exercises[0].sets[0].complete = true
+    persistActiveDraft(draft)
+
+    const restored = await loadState()
+    expect(restored.activeSession?.startedAt).toBe('2026-09-07T16:00:00.000Z')
+    expect(restored.activeSession?.exercises[0].sets[0]).toMatchObject({ reps: 4, complete: true })
   })
 
   it('migrates version-one local data into the personal program', async () => {

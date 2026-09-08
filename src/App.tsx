@@ -1,8 +1,8 @@
-import { useEffect, useState, type ReactElement } from 'react'
+import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { BarChart3, ClipboardList, Dumbbell, History, Home, Settings as SettingsIcon, ShieldCheck } from 'lucide-react'
 import BrandMark from './components/BrandMark'
 import ErrorBoundary from './components/ErrorBoundary'
-import { clearStoredState, loadState, requestPersistentStorage, saveState } from './db'
+import { clearStoredState, loadState, persistActiveDraft, requestPersistentStorage, saveState } from './db'
 import { applyProgression } from './progression'
 import { advanceRuntime, createInitialState, createProgramRuntime, createWorkout, getProgram } from './program'
 import type { AppState, Tab, WorkoutSession } from './types'
@@ -39,29 +39,55 @@ export default function App() {
   const [state, setState] = useState<AppState | null>(null)
   const [tab, setTab] = useState<Tab>('today')
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'error'>('saved')
   const [loadError, setLoadError] = useState(false)
   const [completedSummary, setCompletedSummary] = useState<WorkoutSession | null>(null)
+  const [resumedSessionId, setResumedSessionId] = useState<string | null>(null)
+  const saveQueue = useRef<Promise<void>>(Promise.resolve())
+  const saveGeneration = useRef(0)
+
+  const acceptLoadedState = (loaded: AppState) => {
+    setState(loaded)
+    setResumedSessionId(loaded.activeSession?.id ?? null)
+  }
 
   const reload = () => {
     setLoadError(false)
-    loadState().then((loaded) => setState(loaded)).catch(() => setLoadError(true))
+    loadState().then(acceptLoadedState).catch(() => setLoadError(true))
   }
 
   useEffect(() => {
     let cancelled = false
-    loadState().then((loaded) => { if (!cancelled) setState(loaded) }).catch(() => { if (!cancelled) setLoadError(true) })
+    loadState().then((loaded) => { if (!cancelled) acceptLoadedState(loaded) }).catch(() => { if (!cancelled) setLoadError(true) })
     return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
     if (!state) return
-    const handle = window.setTimeout(() => { saveState(state).then(() => setSaveError(null)).catch(() => setSaveError('Could not save on this device.')) }, 80)
+    persistActiveDraft(state)
+    const generation = ++saveGeneration.current
+    setSaveStatus('saving')
+    const handle = window.setTimeout(() => {
+      const operation = saveQueue.current.catch(() => undefined).then(() => saveState(state))
+      saveQueue.current = operation
+      void operation.then(() => {
+        if (saveGeneration.current === generation) {
+          setSaveError(null)
+          setSaveStatus('saved')
+        }
+      }).catch(() => {
+        if (saveGeneration.current === generation) {
+          setSaveError('Could not save on this device.')
+          setSaveStatus('error')
+        }
+      })
+    }, 80)
     return () => window.clearTimeout(handle)
   }, [state])
 
   useEffect(() => {
     if (!state) return
-    const flush = () => { void saveState(state) }
+    const flush = () => { persistActiveDraft(state); void saveState(state) }
     const onVisibilityChange = () => { if (document.visibilityState === 'hidden') flush() }
     document.addEventListener('visibilitychange', onVisibilityChange)
     window.addEventListener('pagehide', flush)
@@ -71,24 +97,27 @@ export default function App() {
   if (!state && loadError) return <main className="recovery-screen"><Dumbbell aria-hidden="true" /><h1>Could not open your local data</h1><p>Lift will not overwrite it. Retry first; only start fresh if you intend to erase the saved copy on this device.</p><button className="primary-button" onClick={reload}>Retry</button><button className="secondary-button" onClick={() => { if (window.confirm('Erase the unreadable local data and start fresh?')) void clearStoredState().then(() => { setState(createInitialState()); setLoadError(false) }).catch(() => setLoadError(true)) }}>Erase and start fresh</button></main>
   if (!state) return <main className="loading-screen"><span className="loading-mark"><BrandMark /></span><span>Loading your log…</span></main>
 
-  const startWorkout = () => setState((current) => current ? { ...current, activeSession: createWorkout(current) } : current)
-  const updateActive = (updater: (session: WorkoutSession) => WorkoutSession) => setState((current) => current?.activeSession ? { ...current, activeSession: updater(current.activeSession) } : current)
+  const startWorkout = () => { setResumedSessionId(null); setState((current) => { if (!current) return current; const next = { ...current, activeSession: createWorkout(current) }; persistActiveDraft(next); return next }) }
+  const updateActive = (updater: (session: WorkoutSession) => WorkoutSession) => setState((current) => { if (!current?.activeSession) return current; const next = { ...current, activeSession: updater(current.activeSession) }; persistActiveDraft(next); return next })
   const finishWorkout = () => {
     if (!state.activeSession) return
     const shouldRequestPersistentStorage = !state.settings.persistentStorageRequested
     const nextState = completeActiveWorkout(state)
+    persistActiveDraft(nextState)
     setState(nextState)
+    setResumedSessionId(null)
     setCompletedSummary(nextState.history[0] ?? null)
     if (shouldRequestPersistentStorage) void requestPersistentStorage().catch(() => null)
     setTab('today')
   }
   const recover = () => {
-    setState((current) => current ? { ...current, activeSession: null, restTimerEnd: null } : createInitialState())
+    setState((current) => { const next = current ? { ...current, activeSession: null, restTimerEnd: null } : createInitialState(); persistActiveDraft(next); return next })
+    setResumedSessionId(null)
     setCompletedSummary(null)
     setTab('today')
   }
 
-  return <ErrorBoundary onRecover={recover}>{saveError && <div className="error-banner" role="alert">{saveError}</div>}{completedSummary ? <CompletionView session={completedSummary} unit={state.settings.unit} onDone={() => { setCompletedSummary(null); setTab('today') }} onHistory={() => { setCompletedSummary(null); setTab('history') }} /> : state.activeSession ? <WorkoutView session={state.activeSession} settings={state.settings} restTimerEnd={state.restTimerEnd} onUpdate={updateActive} onStartRest={(seconds) => setState((current) => current ? { ...current, restTimerEnd: new Date(Date.now() + seconds * 1000).toISOString() } : current)} onDismissRest={() => setState((current) => current ? { ...current, restTimerEnd: null } : current)} onFinish={finishWorkout} onCancel={() => setState((current) => current ? { ...current, activeSession: null, restTimerEnd: null } : current)} /> : <div className="app-shell">
+  return <ErrorBoundary onRecover={recover}>{saveError && <div className="error-banner" role="alert">{saveError}</div>}{completedSummary ? <CompletionView session={completedSummary} unit={state.settings.unit} onDone={() => { setCompletedSummary(null); setTab('today') }} onHistory={() => { setCompletedSummary(null); setTab('history') }} /> : state.activeSession ? <WorkoutView session={state.activeSession} settings={state.settings} restTimerEnd={state.restTimerEnd} saveStatus={saveStatus} resumed={resumedSessionId === state.activeSession.id} onUpdate={updateActive} onStartRest={(seconds) => setState((current) => { if (!current) return current; const next = { ...current, restTimerEnd: new Date(Date.now() + seconds * 1000).toISOString() }; persistActiveDraft(next); return next })} onDismissRest={() => setState((current) => { if (!current) return current; const next = { ...current, restTimerEnd: null }; persistActiveDraft(next); return next })} onFinish={finishWorkout} onCancel={() => { setResumedSessionId(null); setState((current) => { if (!current) return current; const next = { ...current, activeSession: null, restTimerEnd: null }; persistActiveDraft(next); return next }) }} /> : <div className="app-shell">
     <header className="app-header"><div className="wordmark"><span className="mark"><BrandMark /></span><span>LIFT<small>Training log</small></span></div><span className="local-badge"><ShieldCheck size={14} /> On device</span></header>
     <main className="page-content">
       {tab === 'today' && <TodayView state={state} onStart={startWorkout} />}
