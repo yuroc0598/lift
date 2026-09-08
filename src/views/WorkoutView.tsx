@@ -69,15 +69,24 @@ function ExerciseCard({ index, exercise, unit, barWeight, plates, onUpdate, onSe
   const workingSetsComplete = exercise.sets.length > 0 && workingSetsCompleted === exercise.sets.length
   const nextWarmupIndex = exercise.warmupSets.findIndex((set) => !set.complete)
   const nextWorkingIndex = exercise.sets.findIndex((set) => !set.complete)
+  const warmupsComplete = exercise.warmupSets.length > 0 && warmupSetsCompleted === exercise.warmupSets.length
   const [expanded, setExpanded] = useState(() => !workingSetsComplete)
+  const [warmupsExpanded, setWarmupsExpanded] = useState(false)
   const wasComplete = useRef(workingSetsComplete)
+  const wereWarmupsComplete = useRef(warmupsComplete)
   const bodyId = `exercise-body-${exercise.logId}`
+  const warmupId = `warmups-${exercise.logId}`
 
   useEffect(() => {
     if (workingSetsComplete && !wasComplete.current) setExpanded(false)
     if (!workingSetsComplete && wasComplete.current) setExpanded(true)
     wasComplete.current = workingSetsComplete
   }, [workingSetsComplete])
+
+  useEffect(() => {
+    if (warmupsComplete && !wereWarmupsComplete.current) setWarmupsExpanded(false)
+    wereWarmupsComplete.current = warmupsComplete
+  }, [warmupsComplete])
 
   const updateSet = (setIndex: number, patch: Partial<SetLog>) => onUpdate((current) => ({
     ...current,
@@ -133,9 +142,9 @@ function ExerciseCard({ index, exercise, unit, barWeight, plates, onUpdate, onSe
             {plateResult && <span className="plate-summary">Top: {displayWeight(topSetWeight, unit)}<br />{plateResult.plates.length ? `${plateResult.plates.map((plate) => Number((unit === 'kg' ? plate * 0.45359237 : plate).toFixed(1))).join(' · ')} ${unit} / side` : 'Empty bar'}{!plateResult.exact ? ` (${displayWeight(plateResult.actualWeight, unit)})` : ''}</span>}
           </div>
         )}
-        {exercise.warmupSets.length > 0 && <section className="warmup-block" aria-label={`${exercise.name} warm-up sets`}>
-          <div className="set-section-heading"><strong>Warm-up</strong><span>{warmupSetsCompleted}/{exercise.warmupSets.length}</span></div>
-          <div className="warmup-list">{exercise.warmupSets.map((set, setIndex) => {
+        {exercise.warmupSets.length > 0 && <section className={warmupsExpanded ? 'warmup-block' : 'warmup-block collapsed'} aria-label={`${exercise.name} warm-up sets`}>
+          <button type="button" className="warmup-toggle" aria-label={`${warmupsExpanded ? 'Collapse' : 'Expand'} ${exercise.name} warm-ups`} aria-expanded={warmupsExpanded} aria-controls={warmupId} onClick={() => setWarmupsExpanded((current) => !current)}><span><strong>Warm-up</strong><small>{exercise.warmupSets.length} preparation sets</small></span><b>{warmupSetsCompleted}/{exercise.warmupSets.length}</b><ChevronDown /></button>
+          {warmupsExpanded && <div className="warmup-list" id={warmupId}>{exercise.warmupSets.map((set, setIndex) => {
             const current = setIndex === nextWarmupIndex
             const weightInput = lbToInputWeight(set.weightLb, unit)
             return <div className={['warmup-row', set.complete ? 'complete' : '', current ? 'current' : ''].filter(Boolean).join(' ')} key={set.number} aria-current={current ? 'step' : undefined}>
@@ -145,7 +154,7 @@ function ExerciseCard({ index, exercise, unit, barWeight, plates, onUpdate, onSe
                 <NumberStepper label="Reps" inputLabel={`${exercise.name} warm-up ${set.number} reps`} value={set.reps} inputMode="numeric" minimum={0} maximum={100} inputStep={1} onInput={(text) => { const value = finiteNumberOrNull(text, 100); if (value != null) updateWarmupSet(setIndex, { reps: value }) }} onDecrease={() => updateWarmupSet(setIndex, { reps: Math.max(0, set.reps - 1) })} onIncrease={() => updateWarmupSet(setIndex, { reps: Math.min(100, set.reps + 1) })} />
               </div>
             </div>
-          })}</div>
+          })}</div>}
         </section>}
         <div className="set-section-heading working-heading"><strong>Working sets</strong><span>{exercise.sets.filter((set) => set.complete).length}/{exercise.sets.length}</span></div>
         <div className="set-list" role="group" aria-label={`${exercise.name} sets`}>
@@ -156,7 +165,7 @@ function ExerciseCard({ index, exercise, unit, barWeight, plates, onUpdate, onSe
             const valueStep = timed ? 5 : 1
             const valueLabel = timed ? 'Seconds' : 'Reps'
             const inputLabel = `${exercise.name} set ${set.number} ${timed ? 'seconds' : 'reps'}`
-            const current = nextWarmupIndex < 0 && setIndex === nextWorkingIndex
+            const current = (!warmupsExpanded || nextWarmupIndex < 0) && setIndex === nextWorkingIndex
             const weightInput = lbToInputWeight(set.weightLb, unit)
             return <div className={['set-row', set.complete ? 'complete' : '', current ? 'current' : ''].filter(Boolean).join(' ')} key={set.number} aria-current={current ? 'step' : undefined}>
               <div className="set-row-top">

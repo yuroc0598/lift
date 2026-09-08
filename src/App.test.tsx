@@ -50,6 +50,7 @@ describe('app workflow', () => {
 
     const weight = screen.getByLabelText('Back Squat set 1 weight')
     const reps = screen.getByLabelText('Back Squat set 1 reps')
+    await user.click(screen.getByRole('button', { name: 'Expand Back Squat warm-ups' }))
     const warmupReps = screen.getByLabelText('Back Squat warm-up 1 reps')
     expect(weight).toHaveValue(205)
     expect(reps).toHaveValue(5)
@@ -73,6 +74,7 @@ describe('app workflow', () => {
     render(<App />)
     await screen.findByRole('heading', { name: 'Competition' })
     await user.click(screen.getByRole('button', { name: /start workout/i }))
+    await user.click(screen.getByRole('button', { name: 'Expand Back Squat warm-ups' }))
     await user.click(screen.getByRole('button', { name: 'Complete Back Squat warm-up 1' }))
     await user.click(screen.getByRole('button', { name: 'Complete Back Squat set 1' }))
     await user.click(screen.getByRole('button', { name: 'Finish' }))
@@ -80,6 +82,24 @@ describe('app workflow', () => {
     expect(await screen.findByText('WORKOUT COMPLETE')).toBeInTheDocument()
     expect(screen.getAllByText('1,385 lb').length).toBeGreaterThan(0)
     expect(screen.getByText('Working sets + completed warm-ups')).toBeInTheDocument()
+  })
+
+  it('keeps warm-ups collapsed by default and collapses them after completion', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Competition' })
+    await user.click(screen.getByRole('button', { name: /start workout/i }))
+
+    expect(screen.queryByLabelText('Back Squat warm-up 1 reps')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Expand Back Squat warm-ups' }))
+    expect(screen.getByLabelText('Back Squat warm-up 1 reps')).toBeInTheDocument()
+
+    for (let set = 1; set <= 4; set += 1) {
+      await user.click(screen.getByRole('button', { name: `Complete Back Squat warm-up ${set}` }))
+    }
+
+    expect(await screen.findByRole('button', { name: 'Expand Back Squat warm-ups' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Back Squat warm-up 1 reps')).not.toBeInTheDocument()
   })
 
   it('shows the supplied bodyweight in settings', async () => {

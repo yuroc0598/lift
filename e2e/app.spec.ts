@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 async function completeAllSets(page: import('@playwright/test').Page) {
+  await page.locator('.warmup-toggle').evaluateAll((buttons) => buttons.forEach((button) => (button as HTMLButtonElement).click()))
   await page.locator('.warmup-complete, .complete-set-button').evaluateAll((buttons) => buttons.forEach((button) => (button as HTMLButtonElement).click()))
   await page.getByRole('button', { name: 'Finish', exact: true }).click()
   await page.getByRole('button', { name: /Done/ }).click()
