@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, CircleCheck, RotateCcw, TimerReset } from 'lucide-react'
+import { ChevronDown, CircleCheck, Download, RotateCcw, ShieldCheck, TimerReset } from 'lucide-react'
 import { calculatePlates, completedSetCount, displayWeight, lbToInputWeight, MAX_SUPPORTED_WEIGHT_LB, maximumInputWeight, parseWeightInput, roundToIncrement, warmupSets as buildWarmupSets } from '../lifting'
 import { EXERCISES } from '../program'
 import type { AppState, ExerciseLog, SetLog, WorkoutSession } from '../types'
 import { exerciseScheme, formatDuration } from '../ui'
 
-export default function WorkoutView({ session, settings, restTimerEnd, saveStatus, resumed, onUpdate, onStartRest, onDismissRest, onFinish, onCancel }: {
+export default function WorkoutView({ session, settings, restTimerEnd, saveStatus, resumed, onUpdate, onStartRest, onDismissRest, onBackup, onFinish, onCancel }: {
   session: WorkoutSession
   settings: AppState['settings']
   restTimerEnd: string | null
@@ -14,9 +14,11 @@ export default function WorkoutView({ session, settings, restTimerEnd, saveStatu
   onUpdate: (updater: (session: WorkoutSession) => WorkoutSession) => void
   onStartRest: (seconds: number) => void
   onDismissRest: () => void
+  onBackup: () => Promise<void>
   onFinish: () => void
   onCancel: () => void
 }) {
+  const [backupStatus, setBackupStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const activeExercises = session.exercises.filter((exercise) => !exercise.skipped)
   const completed = session.exercises.reduce((sum, exercise) => sum + completedSetCount(exercise), 0)
   const workingCompleted = activeExercises.reduce((sum, exercise) => sum + exercise.sets.filter((set) => set.complete).length, 0)
@@ -31,6 +33,11 @@ export default function WorkoutView({ session, settings, restTimerEnd, saveStatu
   const updateExercise = (exerciseIndex: number, updater: (exercise: ExerciseLog) => ExerciseLog) => onUpdate((current) => ({ ...current, exercises: current.exercises.map((exercise, index) => index === exerciseIndex ? updater(exercise) : exercise) }))
   const finish = () => { if (completed === total || window.confirm(`Finish with ${total - completed} incomplete sets?`)) onFinish() }
   const cancel = () => { if (window.confirm('Discard this active workout? Your completed history will not be affected.')) onCancel() }
+  const backup = async () => {
+    setBackupStatus('saving')
+    try { await onBackup(); setBackupStatus('saved') }
+    catch (error) { setBackupStatus((error as DOMException).name === 'AbortError' ? 'idle' : 'error') }
+  }
 
   return <div className="workout-shell">
     <header className="workout-header"><button className="text-button danger-text" onClick={cancel}>Cancel</button><div><strong>{session.name}</strong><span><ElapsedTimer startedAt={session.startedAt} /> · {completionPercent}% · <i className={`save-state ${saveStatus}`} aria-live="polite">{saveStatus === 'saving' ? 'Saving…' : saveStatus === 'error' ? 'Not saved' : 'Saved'}</i></span></div><button className="text-button accent-text" onClick={finish}>Finish</button></header>
@@ -39,6 +46,7 @@ export default function WorkoutView({ session, settings, restTimerEnd, saveStatu
       <div className="workout-title"><div className="eyebrow">{session.programName} · {session.day}</div><h1>{session.variation ?? session.name}</h1><div className="workout-metrics"><span><b>{workingCompleted}/{workingTotal} work</b> sets</span><span><b>{warmupCompleted}/{warmupTotal} warm-up</b> sets</span></div>{resumed && (nextExercise ? <button className="resume-session" onClick={() => document.getElementById(`exercise-${nextExercise.logId}`)?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })}><RotateCcw /><span><strong>Workout restored</strong><small>Continue {nextExercise.name} · set {nextSet?.number}</small></span><ChevronDown /></button> : <div className="resume-session complete"><CircleCheck /><span><strong>Workout restored</strong><small>All working sets are done—finish when ready.</small></span></div>)}</div>
       {session.exercises.map((exercise, exerciseIndex) => <ExerciseCard key={exercise.logId} index={exerciseIndex + 1} isNext={exerciseIndex === nextExerciseIndex} exercise={exercise} unit={settings.unit} barWeight={settings.barWeightLb} plates={settings.platesLb} onUpdate={(updater) => updateExercise(exerciseIndex, updater)} onSetCompleted={(seconds) => { if (settings.autoStartRest) onStartRest(seconds) }} />)}
       <label className="notes-field"><span>Workout notes</span><textarea value={session.notes} placeholder="How did the session feel?" onChange={(event) => onUpdate((current) => ({ ...current, notes: event.target.value }))} /></label>
+      <aside className="workout-backup"><ShieldCheck /><span><strong>Your progress is autosaved</strong><small>Save a full file before reinstalling the app.</small></span><button type="button" disabled={backupStatus === 'saving'} onClick={() => void backup()}><Download />{backupStatus === 'saving' ? 'Saving…' : backupStatus === 'saved' ? 'Saved' : 'Backup'}</button>{backupStatus === 'error' && <p role="alert">Could not save the backup.</p>}</aside>
       <button className="primary-button finish-button" onClick={finish}><CircleCheck /> Finish workout</button>
     </main>
     {restTimerEnd && <RestTimer end={restTimerEnd} onAdd={onStartRest} onDismiss={onDismissRest} />}

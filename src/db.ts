@@ -95,16 +95,9 @@ function restoreActiveDraft(state: AppState): AppState {
   }
 }
 
-export async function loadState(): Promise<AppState> {
-  const db = await openDatabase()
-  const stored = await new Promise<Record<string, unknown> | undefined>((resolve, reject) => {
-    const request = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(STATE_KEY)
-    request.onsuccess = () => resolve(request.result as Record<string, unknown> | undefined)
-    request.onerror = () => reject(request.error)
-  })
-  db.close()
+export function normalizeStoredState(stored: unknown): AppState | null {
   const initial = createInitialState()
-  if (!stored) return restoreActiveDraft(initial)
+  if (!isRecord(stored)) return null
   if (stored.schemaVersion === 2) {
     const current = stored as unknown as AppState
     const customPrograms = Array.isArray(current.customPrograms) ? current.customPrograms.filter(isValidCustomProgram) : []
@@ -128,10 +121,21 @@ export async function loadState(): Promise<AppState> {
     const history = Array.isArray(current.history) ? current.history.filter((session) => session && typeof session === 'object').map((session) => migrateSession(session as unknown as Record<string, unknown>)) : []
     const activeSession = current.activeSession && typeof current.activeSession === 'object' ? migrateSession(current.activeSession as unknown as Record<string, unknown>, true, settings.barWeightLb) : null
     const restTimerEnd = typeof current.restTimerEnd === 'string' && Number.isFinite(Date.parse(current.restTimerEnd)) ? current.restTimerEnd : null
-    return restoreActiveDraft({ ...initial, activeProgramId, programStates, customPrograms, history, activeSession, restTimerEnd, settings })
+    return { ...initial, activeProgramId, programStates, customPrograms, history, activeSession, restTimerEnd, settings }
   }
-  if (stored.schemaVersion === 1) return restoreActiveDraft(migrateVersionOne(stored, initial))
-  return restoreActiveDraft(initial)
+  if (stored.schemaVersion === 1) return migrateVersionOne(stored, initial)
+  return null
+}
+
+export async function loadState(): Promise<AppState> {
+  const db = await openDatabase()
+  const stored = await new Promise<unknown>((resolve, reject) => {
+    const request = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(STATE_KEY)
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+  db.close()
+  return restoreActiveDraft(normalizeStoredState(stored) ?? createInitialState())
 }
 
 function migrateVersionOne(stored: Record<string, unknown>, initial: AppState): AppState {

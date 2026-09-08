@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { BarChart3, ClipboardList, Dumbbell, History, Home, Settings as SettingsIcon, ShieldCheck } from 'lucide-react'
+import { stateToBackup } from './backup'
 import BrandMark from './components/BrandMark'
 import ErrorBoundary from './components/ErrorBoundary'
 import { clearStoredState, loadState, persistActiveDraft, requestPersistentStorage, saveState } from './db'
 import { applyProgression } from './progression'
 import { advanceRuntime, createInitialState, createProgramRuntime, createWorkout, getProgram } from './program'
+import { shareOrDownload } from './share'
 import type { AppState, Tab, WorkoutSession } from './types'
 import HistoryView from './views/HistoryView'
 import CompletionView from './views/CompletionView'
@@ -110,6 +112,10 @@ export default function App() {
     if (shouldRequestPersistentStorage) void requestPersistentStorage().catch(() => null)
     setTab('today')
   }
+  const exportFullBackup = async () => {
+    const fileName = `lift-full-backup-${new Date().toISOString().slice(0, 10)}.json`
+    await shareOrDownload(new File([stateToBackup(state)], fileName, { type: 'application/json' }), 'Lift full app backup')
+  }
   const recover = () => {
     setState((current) => { const next = current ? { ...current, activeSession: null, restTimerEnd: null } : createInitialState(); persistActiveDraft(next); return next })
     setResumedSessionId(null)
@@ -117,14 +123,14 @@ export default function App() {
     setTab('today')
   }
 
-  return <ErrorBoundary onRecover={recover}>{saveError && <div className="error-banner" role="alert">{saveError}</div>}{completedSummary ? <CompletionView session={completedSummary} unit={state.settings.unit} onDone={() => { setCompletedSummary(null); setTab('today') }} onHistory={() => { setCompletedSummary(null); setTab('history') }} /> : state.activeSession ? <WorkoutView session={state.activeSession} settings={state.settings} restTimerEnd={state.restTimerEnd} saveStatus={saveStatus} resumed={resumedSessionId === state.activeSession.id} onUpdate={updateActive} onStartRest={(seconds) => setState((current) => { if (!current) return current; const next = { ...current, restTimerEnd: new Date(Date.now() + seconds * 1000).toISOString() }; persistActiveDraft(next); return next })} onDismissRest={() => setState((current) => { if (!current) return current; const next = { ...current, restTimerEnd: null }; persistActiveDraft(next); return next })} onFinish={finishWorkout} onCancel={() => { setResumedSessionId(null); setState((current) => { if (!current) return current; const next = { ...current, activeSession: null, restTimerEnd: null }; persistActiveDraft(next); return next }) }} /> : <div className="app-shell">
+  return <ErrorBoundary onRecover={recover}>{saveError && <div className="error-banner" role="alert">{saveError}</div>}{completedSummary ? <CompletionView session={completedSummary} unit={state.settings.unit} onDone={() => { setCompletedSummary(null); setTab('today') }} onHistory={() => { setCompletedSummary(null); setTab('history') }} /> : state.activeSession ? <WorkoutView session={state.activeSession} settings={state.settings} restTimerEnd={state.restTimerEnd} saveStatus={saveStatus} resumed={resumedSessionId === state.activeSession.id} onUpdate={updateActive} onStartRest={(seconds) => setState((current) => { if (!current) return current; const next = { ...current, restTimerEnd: new Date(Date.now() + seconds * 1000).toISOString() }; persistActiveDraft(next); return next })} onDismissRest={() => setState((current) => { if (!current) return current; const next = { ...current, restTimerEnd: null }; persistActiveDraft(next); return next })} onBackup={exportFullBackup} onFinish={finishWorkout} onCancel={() => { setResumedSessionId(null); setState((current) => { if (!current) return current; const next = { ...current, activeSession: null, restTimerEnd: null }; persistActiveDraft(next); return next }) }} /> : <div className="app-shell">
     <header className="app-header"><div className="wordmark"><span className="mark"><BrandMark /></span><span>LIFT<small>Training log</small></span></div><span className="local-badge"><ShieldCheck size={14} /> On device</span></header>
     <main className="page-content">
       {tab === 'today' && <TodayView state={state} onStart={startWorkout} />}
       {tab === 'history' && <HistoryView history={state.history} unit={state.settings.unit} />}
       {tab === 'progress' && <ProgressView state={state} />}
       {tab === 'plan' && <PlanView state={state} onChange={setState} onActivated={() => setTab('today')} />}
-      {tab === 'settings' && <SettingsView state={state} onChange={setState} onImported={(history) => setState((current) => current ? { ...current, history: mergeImportedHistory(current.history, history) } : current)} onReset={async () => { await clearStoredState(); setState(createInitialState()); setTab('today') }} />}
+      {tab === 'settings' && <SettingsView state={state} onChange={setState} onImported={(history) => setState((current) => current ? { ...current, history: mergeImportedHistory(current.history, history) } : current)} onRestored={(restored) => { persistActiveDraft(restored); setResumedSessionId(restored.activeSession?.id ?? null); setCompletedSummary(null); setState(restored) }} onReset={async () => { await clearStoredState(); setState(createInitialState()); setTab('today') }} />}
     </main>
     <nav className="bottom-nav" aria-label="Primary navigation"><NavButton active={tab === 'today'} label="Today" onClick={() => setTab('today')} icon={<Home />} /><NavButton active={tab === 'history'} label="History" onClick={() => setTab('history')} icon={<History />} /><NavButton active={tab === 'progress'} label="Progress" onClick={() => setTab('progress')} icon={<BarChart3 />} /><NavButton active={tab === 'plan'} label="Plan" onClick={() => setTab('plan')} icon={<ClipboardList />} /><NavButton active={tab === 'settings'} label="Settings" onClick={() => setTab('settings')} icon={<SettingsIcon />} /></nav>
   </div>}</ErrorBoundary>

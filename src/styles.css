@@ -351,6 +351,16 @@ h2 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
 .exercise-notes input { min-width: 0; min-height: 44px; border: 0; border-bottom: 1px solid var(--line); color: var(--text); background: transparent; font-size: 16px; }
 .notes-field { display: block; padding: 17px 4px; }
 .notes-field textarea { width: 100%; min-height: 90px; resize: vertical; padding: 13px; border: 1px solid var(--line); border-radius: 14px; color: var(--text); background: var(--panel); font-size: 16px; }
+.workout-backup { min-height: 68px; margin: 2px 4px 12px; padding: 10px 10px 10px 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; border: 1px solid var(--line-soft); border-radius: 16px; background: rgba(18,22,19,.76); }
+.workout-backup > svg { width: 19px; flex: 0 0 auto; color: var(--accent); }
+.workout-backup > span { min-width: 0; flex: 1; }
+.workout-backup strong, .workout-backup small { display: block; }
+.workout-backup strong { font-size: 11px; }
+.workout-backup small { margin-top: 3px; color: var(--muted); font-size: 9px; line-height: 1.35; }
+.workout-backup button { min-width: 78px; min-height: 44px; padding: 0 9px; display: flex; align-items: center; justify-content: center; gap: 5px; color: var(--accent); border: 1px solid rgba(206,255,69,.16); border-radius: 12px; background: rgba(206,255,69,.055); font-size: 10px; font-weight: 850; }
+.workout-backup button:disabled { opacity: .6; }
+.workout-backup button svg { width: 15px; }
+.workout-backup > p { flex-basis: 100%; margin: 0; color: var(--danger); font-size: 10px; }
 .finish-button { margin-top: 3px; }
 .rest-timer { position: fixed; z-index: 40; left: 50%; bottom: calc(12px + env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(calc(100% - 24px), 500px); min-height: 72px; padding: 11px 12px 11px 16px; display: flex; align-items: center; gap: 12px; border: 1px solid #566d20; border-radius: 20px; background: #1b2115; box-shadow: 0 16px 50px #000; }
 .rest-timer > svg { color: var(--accent); }
@@ -486,6 +496,12 @@ h2 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
 .settings-card { margin-top: 13px; padding: 17px; border: 1px solid var(--line); border-radius: 20px; background: var(--panel); }
 .settings-card h2 { margin-bottom: 10px; }
 .settings-card > p { color: var(--muted); font-size: 13px; line-height: 1.5; }
+.settings-title { display: flex; align-items: center; gap: 10px; }
+.settings-title > svg { width: 20px; flex: 0 0 auto; color: var(--accent); }
+.settings-title h2 { margin: 0; }
+.settings-title small { display: block; margin-top: 2px; color: var(--muted); font-size: 9px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+.backup-card .primary-button { margin-top: 14px; }
+.settings-card > .backup-note { margin: 12px 2px 0; color: #717b74; font-size: 10px; }
 .settings-row { min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 18px; border-top: 1px solid #272c29; }
 .settings-row > span { font-size: 14px; }
 .settings-row small { display: block; color: var(--muted); margin-top: 2px; font-size: 10px; }
