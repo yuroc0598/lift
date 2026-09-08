@@ -67,6 +67,8 @@ function ExerciseCard({ index, exercise, unit, barWeight, plates, onUpdate, onSe
   const workingSetsCompleted = exercise.sets.filter((set) => set.complete).length
   const warmupSetsCompleted = exercise.warmupSets.filter((set) => set.complete).length
   const workingSetsComplete = exercise.sets.length > 0 && workingSetsCompleted === exercise.sets.length
+  const nextWarmupIndex = exercise.warmupSets.findIndex((set) => !set.complete)
+  const nextWorkingIndex = exercise.sets.findIndex((set) => !set.complete)
   const [expanded, setExpanded] = useState(() => !workingSetsComplete)
   const wasComplete = useRef(workingSetsComplete)
   const bodyId = `exercise-body-${exercise.logId}`
@@ -131,25 +133,82 @@ function ExerciseCard({ index, exercise, unit, barWeight, plates, onUpdate, onSe
             {plateResult && <span className="plate-summary">Top: {displayWeight(topSetWeight, unit)}<br />{plateResult.plates.length ? `${plateResult.plates.map((plate) => Number((unit === 'kg' ? plate * 0.45359237 : plate).toFixed(1))).join(' · ')} ${unit} / side` : 'Empty bar'}{!plateResult.exact ? ` (${displayWeight(plateResult.actualWeight, unit)})` : ''}</span>}
           </div>
         )}
-        {exercise.warmupSets.length > 0 && <section className="warmup-block" aria-label={`${exercise.name} warm-up sets`}><div className="set-section-heading"><strong>Warm-up</strong><span>{exercise.warmupSets.filter((set) => set.complete).length}/{exercise.warmupSets.length}</span></div><div className="warmup-list">{exercise.warmupSets.map((set, setIndex) => <div className={set.complete ? 'warmup-row complete' : 'warmup-row'} key={set.number}><span>W{set.number}</span><input aria-label={`${exercise.name} warm-up ${set.number} weight`} type="number" inputMode="decimal" min="0" max={maxInputWeight} step={unit === 'kg' ? 0.5 : 2.5} value={lbToInputWeight(set.weightLb, unit)} onChange={(event) => { const value = parseWeightInput(event.target.value, unit); if (value != null) updateWarmupSet(setIndex, { weightLb: value }) }} /><b>{unit}</b><span>×</span><input aria-label={`${exercise.name} warm-up ${set.number} reps`} type="number" inputMode="numeric" min="0" max="100" value={set.reps} onChange={(event) => { const value = finiteNumberOrNull(event.target.value, 100); if (value != null) updateWarmupSet(setIndex, { reps: value }) }} /><button className="warmup-complete" aria-label={`${set.complete ? 'Undo' : 'Complete'} ${exercise.name} warm-up ${set.number}`} aria-pressed={set.complete} onClick={() => { updateWarmupSet(setIndex, { complete: !set.complete }); if (!set.complete) onSetCompleted(Math.min(90, exercise.restSeconds)) }}><CircleCheck /></button></div>)}</div></section>}
-        <div className="set-section-heading working-heading"><strong>Working sets</strong><span>{exercise.sets.filter((set) => set.complete).length}/{exercise.sets.length}</span></div>
-        <div className="set-table" role="group" aria-label={`${exercise.name} sets`}>
-          <div className="set-table-head"><span>Set</span><span>Weight</span><span>{definition?.progression === 'timed' ? 'Seconds' : 'Reps'}</span><span>RPE</span><span>Done</span></div>
-          {exercise.sets.map((set, setIndex) => (
-            <div className={set.complete ? 'set-row complete' : 'set-row'} key={set.number}>
-              <span className="set-number">{set.number}</span>
-              {definition?.weightMode === 'none' ? <span className="no-weight">—</span> : <input aria-label={`${exercise.name} set ${set.number} weight`} inputMode="decimal" type="number" min="0" max={maxInputWeight} step={unit === 'kg' ? 0.5 : 2.5} value={lbToInputWeight(set.weightLb, unit)} onChange={(event) => updateSet(setIndex, { weightLb: parseWeightInput(event.target.value, unit) })} />}
-              <input aria-label={`${exercise.name} set ${set.number} ${definition?.progression === 'timed' ? 'seconds' : 'reps'}`} inputMode="numeric" type="number" min="0" max={definition?.progression === 'timed' ? 86400 : 999} value={(definition?.progression === 'timed' ? set.seconds : set.reps) ?? ''} placeholder={set.plusSet ? `${set.minReps}+` : undefined} onChange={(event) => updateSet(setIndex, definition?.progression === 'timed' ? { seconds: finiteNumberOrNull(event.target.value, 86400) } : { reps: finiteNumberOrNull(event.target.value, 999) })} />
-              <select aria-label={`${exercise.name} set ${set.number} RPE`} value={set.rpe ?? ''} onChange={(event) => updateSet(setIndex, { rpe: finiteNumberOrNull(event.target.value) })}><option value="">—</option>{[6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10].map((rpe) => <option key={rpe} value={rpe}>{rpe}</option>)}</select>
-              <button className="complete-set-button" aria-label={`${set.complete ? 'Undo' : 'Complete'} ${exercise.name} set ${set.number}`} aria-pressed={set.complete} onClick={() => { updateSet(setIndex, { complete: !set.complete }); if (!set.complete) onSetCompleted(exercise.restSeconds) }}><CircleCheck /></button>
+        {exercise.warmupSets.length > 0 && <section className="warmup-block" aria-label={`${exercise.name} warm-up sets`}>
+          <div className="set-section-heading"><strong>Warm-up</strong><span>{warmupSetsCompleted}/{exercise.warmupSets.length}</span></div>
+          <div className="warmup-list">{exercise.warmupSets.map((set, setIndex) => {
+            const current = setIndex === nextWarmupIndex
+            const weightInput = lbToInputWeight(set.weightLb, unit)
+            return <div className={['warmup-row', set.complete ? 'complete' : '', current ? 'current' : ''].filter(Boolean).join(' ')} key={set.number} aria-current={current ? 'step' : undefined}>
+              <div className="set-row-top"><div className="set-row-title"><strong>Warm-up {set.number}</strong><small>{displayWeight(set.weightLb, unit)} × {set.reps}</small></div>{current && <span className="next-set-badge">Next</span>}<button className="warmup-complete" aria-label={`${set.complete ? 'Undo' : 'Complete'} ${exercise.name} warm-up ${set.number}`} aria-pressed={set.complete} onClick={() => { updateWarmupSet(setIndex, { complete: !set.complete }); if (!set.complete) onSetCompleted(Math.min(90, exercise.restSeconds)) }}><CircleCheck /><span>{set.complete ? 'Undo' : 'Done'}</span></button></div>
+              <div className="set-adjusters">
+                <NumberStepper label="Weight" unit={unit} inputLabel={`${exercise.name} warm-up ${set.number} weight`} value={weightInput} inputMode="decimal" minimum={0} maximum={maxInputWeight} inputStep={unit === 'kg' ? 0.5 : 2.5} onInput={(text) => { const value = parseWeightInput(text, unit); if (value != null) updateWarmupSet(setIndex, { weightLb: value }) }} onDecrease={() => updateWarmupSet(setIndex, { weightLb: Math.max(0, set.weightLb - exercise.incrementLb) })} onIncrease={() => updateWarmupSet(setIndex, { weightLb: Math.min(MAX_SUPPORTED_WEIGHT_LB, set.weightLb + exercise.incrementLb) })} />
+                <NumberStepper label="Reps" inputLabel={`${exercise.name} warm-up ${set.number} reps`} value={set.reps} inputMode="numeric" minimum={0} maximum={100} inputStep={1} onInput={(text) => { const value = finiteNumberOrNull(text, 100); if (value != null) updateWarmupSet(setIndex, { reps: value }) }} onDecrease={() => updateWarmupSet(setIndex, { reps: Math.max(0, set.reps - 1) })} onIncrease={() => updateWarmupSet(setIndex, { reps: Math.min(100, set.reps + 1) })} />
+              </div>
             </div>
-          ))}
+          })}</div>
+        </section>}
+        <div className="set-section-heading working-heading"><strong>Working sets</strong><span>{exercise.sets.filter((set) => set.complete).length}/{exercise.sets.length}</span></div>
+        <div className="set-list" role="group" aria-label={`${exercise.name} sets`}>
+          {exercise.sets.map((set, setIndex) => {
+            const timed = definition?.progression === 'timed'
+            const value = timed ? set.seconds : set.reps
+            const valueMaximum = timed ? 86400 : 999
+            const valueStep = timed ? 5 : 1
+            const valueLabel = timed ? 'Seconds' : 'Reps'
+            const inputLabel = `${exercise.name} set ${set.number} ${timed ? 'seconds' : 'reps'}`
+            const current = nextWarmupIndex < 0 && setIndex === nextWorkingIndex
+            const weightInput = lbToInputWeight(set.weightLb, unit)
+            return <div className={['set-row', set.complete ? 'complete' : '', current ? 'current' : ''].filter(Boolean).join(' ')} key={set.number} aria-current={current ? 'step' : undefined}>
+              <div className="set-row-top">
+                <div className="set-row-title"><strong>Set {set.number}{set.plusSet ? '+' : ''}</strong><small>{setTargetLabel(set, timed)}</small></div>
+                {current && <span className="next-set-badge">Next</span>}
+                <label className="set-rpe"><span>RPE</span><select aria-label={`${exercise.name} set ${set.number} RPE`} value={set.rpe ?? ''} onChange={(event) => updateSet(setIndex, { rpe: finiteNumberOrNull(event.target.value) })}><option value="">—</option>{[6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10].map((rpe) => <option key={rpe} value={rpe}>{rpe}</option>)}</select></label>
+                <button className="complete-set-button" aria-label={`${set.complete ? 'Undo' : 'Complete'} ${exercise.name} set ${set.number}`} aria-pressed={set.complete} onClick={() => { updateSet(setIndex, { complete: !set.complete }); if (!set.complete) onSetCompleted(exercise.restSeconds) }}><CircleCheck /><span>{set.complete ? 'Undo' : 'Done'}</span></button>
+              </div>
+              <div className={definition?.weightMode === 'none' ? 'set-adjusters single' : 'set-adjusters'}>
+                {definition?.weightMode !== 'none' && <NumberStepper label={definition?.weightMode === 'bodyweight' ? 'Added' : 'Weight'} unit={unit} inputLabel={`${exercise.name} set ${set.number} weight`} value={weightInput} inputMode="decimal" minimum={0} maximum={maxInputWeight} inputStep={unit === 'kg' ? 0.5 : 2.5} onInput={(text) => updateSet(setIndex, { weightLb: parseWeightInput(text, unit) })} onDecrease={() => updateSet(setIndex, { weightLb: Math.max(0, (set.weightLb ?? 0) - exercise.incrementLb) })} onIncrease={() => updateSet(setIndex, { weightLb: Math.min(MAX_SUPPORTED_WEIGHT_LB, (set.weightLb ?? 0) + exercise.incrementLb) })} />}
+                <NumberStepper label={valueLabel} inputLabel={inputLabel} value={value ?? ''} inputMode="numeric" minimum={0} maximum={valueMaximum} inputStep={valueStep} placeholder={set.plusSet ? `${set.minReps}+` : undefined} onInput={(text) => updateSet(setIndex, timed ? { seconds: finiteNumberOrNull(text, valueMaximum) } : { reps: finiteNumberOrNull(text, valueMaximum) })} onDecrease={() => updateSet(setIndex, timed ? { seconds: Math.max(0, (set.seconds ?? set.targetSeconds ?? 0) - valueStep) } : { reps: Math.max(0, (set.reps ?? set.minReps) - valueStep) })} onIncrease={() => updateSet(setIndex, timed ? { seconds: Math.min(valueMaximum, (set.seconds ?? set.targetSeconds ?? 0) + valueStep) } : { reps: Math.min(valueMaximum, (set.reps ?? set.minReps) + valueStep) })} />
+              </div>
+            </div>
+          })}
         </div>
         <label className="exercise-notes"><span>Notes</span><input value={exercise.notes} placeholder="Optional" onChange={(event) => onUpdate((current) => ({ ...current, notes: event.target.value }))} /></label>
         </>}
       </div>}
     </article>
   )
+}
+
+function setTargetLabel(set: SetLog, timed: boolean): string {
+  if (timed) return `Target ${set.targetSeconds ?? set.seconds ?? 0}s`
+  if (set.plusSet) return `Target ${set.minReps}+ reps`
+  if (set.minReps === set.maxReps) return `Target ${set.minReps} reps`
+  return `Target ${set.minReps}–${set.maxReps} reps`
+}
+
+function NumberStepper({ label, unit, inputLabel, value, inputMode, minimum, maximum, inputStep, placeholder, onInput, onDecrease, onIncrease }: {
+  label: string
+  unit?: string
+  inputLabel: string
+  value: number | ''
+  inputMode: 'numeric' | 'decimal'
+  minimum: number
+  maximum: number
+  inputStep: number
+  placeholder?: string
+  onInput: (text: string) => void
+  onDecrease: () => void
+  onIncrease: () => void
+}) {
+  const number = value === '' ? null : value
+  return <div className="number-stepper">
+    <span className="number-stepper-label">{label}{unit && <small>{unit}</small>}</span>
+    <div className="number-stepper-control">
+      <button type="button" aria-label={`Decrease ${inputLabel}`} disabled={number == null || number <= minimum} onClick={onDecrease}>−</button>
+      <input aria-label={inputLabel} type="number" inputMode={inputMode} min={minimum} max={maximum} step={inputStep} value={value} placeholder={placeholder} onChange={(event) => onInput(event.target.value)} />
+      <button type="button" aria-label={`Increase ${inputLabel}`} disabled={number != null && number >= maximum} onClick={onIncrease}>+</button>
+    </div>
+  </div>
 }
 
 function finiteNumberOrNull(text: string, maximum = Number.POSITIVE_INFINITY): number | null {

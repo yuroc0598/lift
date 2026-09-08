@@ -42,6 +42,32 @@ describe('app workflow', () => {
     expect(screen.getByRole('button', { name: 'Collapse Back Squat' })).toHaveAttribute('aria-expanded', 'true')
   })
 
+  it('adjusts workout weight and reps without opening the keyboard', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Competition' })
+    await user.click(screen.getByRole('button', { name: /start workout/i }))
+
+    const weight = screen.getByLabelText('Back Squat set 1 weight')
+    const reps = screen.getByLabelText('Back Squat set 1 reps')
+    const warmupReps = screen.getByLabelText('Back Squat warm-up 1 reps')
+    expect(weight).toHaveValue(205)
+    expect(reps).toHaveValue(5)
+    expect(warmupReps).toHaveValue(8)
+
+    await user.click(screen.getByRole('button', { name: 'Decrease Back Squat set 1 weight' }))
+    await user.click(screen.getByRole('button', { name: 'Decrease Back Squat set 1 reps' }))
+    await user.click(screen.getByRole('button', { name: 'Increase Back Squat warm-up 1 reps' }))
+    expect(weight).toHaveValue(200)
+    expect(reps).toHaveValue(4)
+    expect(warmupReps).toHaveValue(9)
+
+    await user.click(screen.getByRole('button', { name: 'Increase Back Squat set 1 weight' }))
+    await user.click(screen.getByRole('button', { name: 'Increase Back Squat set 1 reps' }))
+    expect(weight).toHaveValue(205)
+    expect(reps).toHaveValue(5)
+  })
+
   it('shows total lifted volume after finishing and includes completed warm-ups', async () => {
     const user = userEvent.setup()
     render(<App />)
