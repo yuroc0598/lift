@@ -45,6 +45,14 @@ describe('program library', () => {
     expect(createWorkout(state).exercises.some((item) => item.exerciseId === 'incline-bench')).toBe(true)
   })
 
+  it('creates an explicitly selected session without changing its prescribed loads', () => {
+    const state = createInitialState()
+    const session = createWorkout(state, new Date('2026-09-09T17:00:00.000Z'), 1)
+    expect(session).toMatchObject({ workoutIndex: 1, day: 'B', name: 'Deadlift + upper' })
+    expect(session.exercises.some((item) => item.exerciseId === 'feet-up-bench')).toBe(true)
+    expect(state.programStates['personal-powerlifting'].nextWorkoutIndex).toBe(0)
+  })
+
   it('creates Texas volume and recovery percentages', () => {
     const state = createInitialState()
     state.activeProgramId = 'texas-method'
@@ -76,5 +84,14 @@ describe('program library', () => {
     expect(advanced.progress.deadlift.workingWeightLb).toBe(245)
     expect(advanced.progress.bench.workingWeightLb).toBe(200)
     expect(advanced.progress.ohp.workingWeightLb).toBe(85)
+  })
+
+  it('advances the schedule from the session that was actually completed', () => {
+    const state = createInitialState()
+    const program = getProgram(state)
+    const runtime = createProgramRuntime(program)
+    const advanced = advanceRuntime(program, runtime, runtime.progress, 1)
+    expect(advanced.nextWorkoutIndex).toBe(2)
+    expect(advanced.completedWorkouts).toBe(1)
   })
 })

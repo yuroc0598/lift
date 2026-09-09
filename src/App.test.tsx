@@ -167,6 +167,29 @@ describe('app workflow', () => {
     expect(screen.getByText('Incline Bench Press')).toBeInTheDocument()
   })
 
+  it('starts a different session than scheduled and continues from the completed session', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Competition' })
+
+    const sessionPicker = screen.getByRole('combobox', { name: 'Workout this session' })
+    expect(sessionPicker).toHaveValue('0')
+    expect(screen.getByText('Scheduled: 1. A · Competition')).toBeInTheDocument()
+
+    await user.selectOptions(sessionPicker, '1')
+    expect(await screen.findByRole('heading', { name: 'Deadlift + upper' })).toBeInTheDocument()
+    expect(screen.getByText('Feet-up Bench Press')).toBeInTheDocument()
+    expect(document.querySelector('.session-override-note')).toHaveTextContent('Override selected. After this workout, C · Paused technique will be next.')
+
+    await user.click(screen.getByRole('button', { name: 'Start workout B' }))
+    expect(await screen.findByRole('heading', { name: 'Feet-up bench week' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Finish' }))
+    await user.click(screen.getByRole('button', { name: /Done/ }))
+
+    expect(await screen.findByRole('heading', { name: 'Paused technique' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Workout this session' })).toHaveValue('2')
+  })
+
   it('switches to Texas Method without deleting the personal plan state', async () => {
     const user = userEvent.setup()
     render(<App />)

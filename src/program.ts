@@ -154,18 +154,26 @@ export function getNextWorkout(state: AppState, programId = state.activeProgramI
   return { program, runtime, template: program.workouts[runtime.nextWorkoutIndex] }
 }
 
-export function createWorkout(state: AppState, now = new Date()): WorkoutSession {
-  const { program, runtime, template } = getNextWorkout(state)
-  return { id: makeId(), programId: program.id, programName: program.name, programVersion: program.version, workoutIndex: runtime.nextWorkoutIndex, day: template.day, name: template.name, variation: template.focus, startedAt: now.toISOString(), completedAt: null, bodyweightLb: state.settings.bodyweightLb, notes: '', exercises: template.prescriptions.map((prescription, index) => toExerciseLog(prescription, runtime, index, state.settings.barWeightLb)) }
+function workoutAtIndex(program: ProgramDefinition, workoutIndex: number): { template: WorkoutTemplate; workoutIndex: number } {
+  const normalizedIndex = Number.isFinite(workoutIndex) ? Math.max(0, Math.floor(workoutIndex)) % program.workouts.length : 0
+  return { template: program.workouts[normalizedIndex], workoutIndex: normalizedIndex }
 }
 
-export function previewNextWorkout(state: AppState) {
-  const { program, runtime, template } = getNextWorkout(state)
-  return { program, runtime, template, exercises: template.prescriptions.map((prescription, index) => toExerciseLog(prescription, runtime, index, state.settings.barWeightLb)) }
+export function createWorkout(state: AppState, now = new Date(), selectedWorkoutIndex?: number): WorkoutSession {
+  const { program, runtime } = getNextWorkout(state)
+  const { template, workoutIndex } = workoutAtIndex(program, selectedWorkoutIndex ?? runtime.nextWorkoutIndex)
+  return { id: makeId(), programId: program.id, programName: program.name, programVersion: program.version, workoutIndex, day: template.day, name: template.name, variation: template.focus, startedAt: now.toISOString(), completedAt: null, bodyweightLb: state.settings.bodyweightLb, notes: '', exercises: template.prescriptions.map((prescription, index) => toExerciseLog(prescription, runtime, index, state.settings.barWeightLb)) }
 }
 
-export function advanceRuntime(program: ProgramDefinition, runtime: ProgramRuntime, progress: Record<string, ExerciseProgress>): ProgramRuntime {
-  const nextWorkoutIndex = (runtime.nextWorkoutIndex + 1) % program.workouts.length
+export function previewNextWorkout(state: AppState, selectedWorkoutIndex?: number) {
+  const { program, runtime } = getNextWorkout(state)
+  const { template, workoutIndex } = workoutAtIndex(program, selectedWorkoutIndex ?? runtime.nextWorkoutIndex)
+  return { program, runtime, template, workoutIndex, exercises: template.prescriptions.map((prescription, index) => toExerciseLog(prescription, runtime, index, state.settings.barWeightLb)) }
+}
+
+export function advanceRuntime(program: ProgramDefinition, runtime: ProgramRuntime, progress: Record<string, ExerciseProgress>, completedWorkoutIndex = runtime.nextWorkoutIndex): ProgramRuntime {
+  const completedIndex = workoutAtIndex(program, completedWorkoutIndex).workoutIndex
+  const nextWorkoutIndex = (completedIndex + 1) % program.workouts.length
   const completedCycle = nextWorkoutIndex === 0
   const nextProgress = structuredClone(progress)
   if (completedCycle && program.id === '531-rolling') {

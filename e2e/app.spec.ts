@@ -51,6 +51,23 @@ test('cycles workouts and rotates the B bench variation', async ({ page }, testI
   await expect(page.getByText('Incline Bench Press')).toBeVisible()
 })
 
+test('can override the scheduled workout for one session', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-chrome', 'Session override flow runs once')
+  await page.goto('/')
+  const sessionPicker = page.getByRole('combobox', { name: 'Workout this session' })
+  await expect(sessionPicker).toHaveValue('0')
+  await sessionPicker.selectOption('1')
+  await expect(page.getByRole('heading', { name: 'Deadlift + upper' })).toBeVisible()
+  await expect(page.getByText(/Override selected/)).toBeVisible()
+
+  await page.getByRole('button', { name: 'Start workout B' }).click()
+  await expect(page.getByRole('heading', { name: 'Feet-up bench week' })).toBeVisible()
+  await completeAllSets(page)
+
+  await expect(page.getByRole('heading', { name: 'Paused technique' })).toBeVisible()
+  await expect(sessionPicker).toHaveValue('2')
+})
+
 test('exports completed history as CSV', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chrome', 'Download behavior is covered in desktop Chrome')
   await page.goto('/')

@@ -34,7 +34,7 @@ function completeActiveWorkout(state: AppState, completedAt = new Date()): AppSt
     adjustedProgress[exercise.progressionKey] = { ...saved, workingWeightLb: exercise.baseWeightLb }
   }
   const progressed = applyProgression(adjustedProgress, completed)
-  return { ...state, activeSession: null, restTimerEnd: null, settings: state.settings.persistentStorageRequested ? state.settings : { ...state.settings, persistentStorageRequested: true }, programStates: { ...state.programStates, [program.id]: advanceRuntime(program, runtime, progressed) }, history: [completed, ...state.history] }
+  return { ...state, activeSession: null, restTimerEnd: null, settings: state.settings.persistentStorageRequested ? state.settings : { ...state.settings, persistentStorageRequested: true }, programStates: { ...state.programStates, [program.id]: advanceRuntime(program, runtime, progressed, completed.workoutIndex) }, history: [completed, ...state.history] }
 }
 
 export default function App() {
@@ -99,7 +99,7 @@ export default function App() {
   if (!state && loadError) return <main className="recovery-screen"><Dumbbell aria-hidden="true" /><h1>Could not open your local data</h1><p>Lift will not overwrite it. Retry first; only start fresh if you intend to erase the saved copy on this device.</p><button className="primary-button" onClick={reload}>Retry</button><button className="secondary-button" onClick={() => { if (window.confirm('Erase the unreadable local data and start fresh?')) void clearStoredState().then(() => { setState(createInitialState()); setLoadError(false) }).catch(() => setLoadError(true)) }}>Erase and start fresh</button></main>
   if (!state) return <main className="loading-screen"><span className="loading-mark"><BrandMark /></span><span>Loading your log…</span></main>
 
-  const startWorkout = () => { setResumedSessionId(null); setState((current) => { if (!current) return current; const next = { ...current, activeSession: createWorkout(current) }; persistActiveDraft(next); return next }) }
+  const startWorkout = (workoutIndex: number) => { setResumedSessionId(null); setState((current) => { if (!current) return current; const next = { ...current, activeSession: createWorkout(current, new Date(), workoutIndex) }; persistActiveDraft(next); return next }) }
   const updateActive = (updater: (session: WorkoutSession) => WorkoutSession) => setState((current) => { if (!current?.activeSession) return current; const next = { ...current, activeSession: updater(current.activeSession) }; persistActiveDraft(next); return next })
   const finishWorkout = () => {
     if (!state.activeSession) return

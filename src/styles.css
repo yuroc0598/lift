@@ -96,6 +96,20 @@ h1 { margin: 7px 0 0; font-size: clamp(37px, 10vw, 52px); line-height: .98; lett
 .page-lead { max-width: 34rem; color: var(--muted); margin: 10px 0 25px; font-size: 15px; line-height: 1.45; }
 h2 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
 
+.session-choice { margin: -7px 0 13px; padding: 15px; border: 1px solid var(--line-soft); border-radius: 20px; background: rgba(18,22,19,.88); }
+.session-choice-heading { display: flex; align-items: center; gap: 11px; margin-bottom: 11px; }
+.session-choice-heading strong, .session-choice-heading small { display: block; }
+.session-choice-heading strong { font-size: 13px; }
+.session-choice-heading small { margin-top: 3px; color: var(--muted); font-size: 10px; }
+.session-choice-icon { width: 34px; height: 34px; flex: 0 0 auto; display: grid; place-items: center; color: var(--accent); border-radius: 11px; background: var(--accent-dark); }
+.session-choice-icon svg { width: 17px; }
+.session-select-wrap { position: relative; }
+.session-select-wrap select { width: 100%; min-height: 52px; appearance: none; -webkit-appearance: none; padding: 0 43px 0 14px; color: var(--text); border: 1px solid #3b453e; border-radius: 14px; outline: 0; background: #111512; font: inherit; font-size: 14px; font-weight: 750; }
+.session-select-wrap select:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(200,255,61,.12); }
+.session-select-wrap > svg { position: absolute; top: 50%; right: 14px; width: 18px; color: var(--accent); pointer-events: none; transform: translateY(-50%); }
+.session-override-note { margin: 10px 2px 0; color: #aab3ac; font-size: 11px; line-height: 1.45; }
+.session-override-note b { color: var(--accent); }
+
 .hero-card {
   position: relative;
   overflow: hidden;
